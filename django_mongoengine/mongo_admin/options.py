@@ -375,8 +375,7 @@ class DocumentAdmin(BaseDocumentAdmin):
 
         # Populate deleted_objects, a data structure of all related objects that
         # will also be deleted.
-        (deleted_objects, model_count, perms_needed, protected) = get_deleted_objects(
-            [obj], opts, request.user, self.admin_site, using)
+        (deleted_objects, model_count, perms_needed, protected) = [obj], {self.model: 1}, False, False
 
         if request.POST:  # The user has already confirmed the deletion.
             if perms_needed:
