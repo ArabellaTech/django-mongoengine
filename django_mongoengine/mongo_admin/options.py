@@ -31,6 +31,7 @@ from django_mongoengine.fields import (ListField, EmbeddedDocumentField,
                                        ReferenceField, StringField)
 
 from django_mongoengine.mongo_admin.util import RelationWrapper
+from django_mongoengine.mongo_admin.actions import delete_selected
 
 from django_mongoengine.utils.wrappers import copy_class
 from django_mongoengine.utils.monkey import get_patched_django_module
@@ -149,10 +150,16 @@ class BaseDocumentAdmin(djmod.BaseModelAdmin):
             })
 
 
+def patched_get_actions(self, request):
+    actions = self.orig_get_actions(request)
+    if 'delete_selected' in actions:
+        ds = actions['delete_selected']
+        actions['delete_selected'] = (delete_selected, ds[1], ds[2])
+    return actions
+
 @copy_class(djmod.ModelAdmin)
 class DocumentAdmin(BaseDocumentAdmin):
     "Encapsulates all admin options and functionality for a given model."
-
 
     def __init__(self, model, admin_site):
         self.model = model
@@ -240,7 +247,7 @@ class DocumentAdmin(BaseDocumentAdmin):
         """
         if not self.log:
             return
-        super(DocumentAdmin, self).log_deletion(request, object, object_repr)
+        # super(DocumentAdmin, self).log_deletion(request, object, object_repr)
 
     @csrf_protect_m
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
@@ -377,7 +384,7 @@ class DocumentAdmin(BaseDocumentAdmin):
             obj_display = force_text(obj)
             attr = str(to_field) if to_field else opts.pk.attname
             obj_id = obj.serializable_value(attr)
-            self.log_deletion(request, obj, obj_display)
+            # self.log_deletion(request, obj, obj_display)
             self.delete_model(request, obj)
 
             return self.response_delete(request, obj_display, obj_id)
@@ -449,6 +456,8 @@ class DocumentAdmin(BaseDocumentAdmin):
             "admin/%s/object_history.html" % app_label,
             "admin/object_history.html"
         ], context)
+DocumentAdmin.orig_get_actions = DocumentAdmin.get_actions
+DocumentAdmin.get_actions = patched_get_actions
 
 
 class InlineDocumentAdmin(BaseDocumentAdmin):
@@ -528,6 +537,7 @@ class InlineDocumentAdmin(BaseDocumentAdmin):
         fields = form.base_fields.keys() + list(self.get_readonly_fields(request, obj))
         return [(None, {'fields': fields})]
 
+
 class EmbeddedDocumentAdmin(InlineDocumentAdmin):
     def __init__(self, field, parent_document, admin_site):
         if hasattr(field, 'field'):
@@ -559,11 +569,14 @@ class EmbeddedDocumentAdmin(InlineDocumentAdmin):
                 self.doc_list = [emb_doc]
         return self.doc_list
 
+
 class StackedDocumentInline(InlineDocumentAdmin):
     template = 'admin/edit_inline/stacked.html'
 
+
 class EmbeddedStackedDocumentAdmin(EmbeddedDocumentAdmin):
     template = 'admin/edit_inline/stacked.html'
+
 
 class TabularDocumentInline(InlineDocumentAdmin):
     template = 'admin/edit_inline/tabular.html'

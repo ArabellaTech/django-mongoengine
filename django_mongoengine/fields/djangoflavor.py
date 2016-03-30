@@ -20,6 +20,8 @@ _field_defaults = (
 class DjangoField(object):
 
     get_choices = Field.__dict__["get_choices"]
+    is_relation = False
+    rel = None
 
     def __init__(self, *args, **kwargs):
         for k, v in _field_defaults:

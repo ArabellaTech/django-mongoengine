@@ -13,7 +13,8 @@ class QueryWrapper(object):
 
     def __init__(self, q, ordering):
         self.q = q
-        self.order_by = ordering
+        if ordering is not None:
+            self.order_by = ordering
 
 class QuerySet(qs.QuerySet):
     """
@@ -39,7 +40,6 @@ class QuerySet(qs.QuerySet):
 
     def exists(self):
         return bool(self)
-
 
     def _clone(self):
         return self.clone()

@@ -44,14 +44,14 @@ def _delete_selected(modeladmin, request, queryset):
     # Populate deletable_objects, a data structure of all related objects that
     # will also be deleted.
     # TODO: Permissions would be so cool...
-    deletable_objects, perms_needed, protected = get_deleted_objects(
-        queryset, opts, request.user, modeladmin.admin_site, using)
+    # deletable_objects, perms_needed, protected = get_deleted_objects(
+    #     queryset, opts, request.user, modeladmin.admin_site, using)
 
     # The user has already confirmed the deletion.
     # Do the deletion and return a None to display the change list view again.
     if request.POST.get('post'):
-        if perms_needed:
-            raise PermissionDenied
+        # if perms_needed:
+        #     raise PermissionDenied
         n = len(queryset)
         if n:
             for obj in queryset:
@@ -61,7 +61,7 @@ def _delete_selected(modeladmin, request, queryset):
                 # processed.
                 obj.delete()
             # This is what you get if you have to monkey patch every object in a changelist
-            # No queryset object, I can tell ya. So we get a new one and delete that. 
+            # No queryset object, I can tell ya. So we get a new one and delete that.
             #pk_list = [o.pk for o in queryset]
             #klass = queryset[0].__class__
             #qs = klass.objects.filter(pk__in=pk_list)
@@ -77,24 +77,24 @@ def _delete_selected(modeladmin, request, queryset):
     else:
         objects_name = force_text(opts.verbose_name_plural)
 
-    if perms_needed or protected:
-        title = _("Cannot delete %(name)s") % {"name": objects_name}
-    else:
-        title = _("Are you sure?")
+    # if perms_needed or protected:
+    #     title = _("Cannot delete %(name)s") % {"name": objects_name}
+    # else:
+    #     title = _("Are you sure?")
 
     context = {
-        "title": title,
+        # "title": title,
         "objects_name": objects_name,
-        "deletable_objects": [deletable_objects],
+        # "deletable_objects": [deletable_objects],
         'queryset': queryset,
-        "perms_lacking": perms_needed,
-        "protected": protected,
+        # "perms_lacking": perms_needed,
+        # "protected": protected,
         "opts": opts,
-        "root_path": modeladmin.admin_site.root_path,
+        # "root_path": modeladmin.admin_site.root_path,
         "app_label": app_label,
         'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
     }
-    
+
     # Display the confirmation page
     return render_to_response(modeladmin.delete_selected_confirmation_template or [
         "admin/%s/%s/delete_selected_confirmation.html" % (app_label, opts.object_name.lower()),
