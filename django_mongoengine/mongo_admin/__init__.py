@@ -1,10 +1,10 @@
 from django.utils.module_loading import autodiscover_modules
 
-from .options import DocumentAdmin
+from .options import DocumentAdmin, JSONDocumentAdmin
 from .sites import site
 from .decorators import register
 
-__all__ = ['DocumentAdmin', 'site', 'register']
+__all__ = ['DocumentAdmin', 'JSONDocumentAdmin', 'site', 'register']
 
 
 def autodiscover():

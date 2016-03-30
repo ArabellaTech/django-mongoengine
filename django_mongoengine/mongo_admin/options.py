@@ -580,3 +580,152 @@ class EmbeddedStackedDocumentAdmin(EmbeddedDocumentAdmin):
 
 class TabularDocumentInline(InlineDocumentAdmin):
     template = 'admin/edit_inline/tabular.html'
+
+
+# EXPERIMENT
+#
+#
+#
+# JSON Based Document - messy quick implementation, clean it up later
+import json
+
+
+class JSONWidget(forms.Textarea):
+    def __init__(self, *args, **kwargs):
+        attrs = kwargs.setdefault('attrs', {})
+        attrs.setdefault('style', 'width: 100%; height: 600px;')
+        super(JSONWidget, self).__init__(*args, **kwargs)
+
+    def render(self, name, value, attrs=None):
+        if value is None:
+            value = ""
+        if not isinstance(value, basestring):
+            value = json.dumps(value, ensure_ascii=False, indent=4)
+        return super(JSONWidget, self).render(name, value, attrs)
+
+
+class SimpleJSONForm(forms.Form):
+    json = forms.CharField(widget=JSONWidget)
+
+    def __init__(self, *args, **kwargs):
+        self.instance = kwargs.pop('instance', None)
+        if self.instance:
+            kwargs['initial'] = {'json': self.prepare_json_data()}
+        super(SimpleJSONForm, self).__init__(*args, **kwargs)
+
+    def prepare_json_data(self):
+        json_obj = json.loads(self.instance.to_json())
+        if '_id' in json_obj:
+            del json_obj['_id']
+        return json_obj
+
+    def clean_json(self):
+        value = self.cleaned_data.get('json')
+        try:
+            json_data = json.loads(value)
+        except ValueError, e:
+            raise forms.ValidationError(e.message)
+
+        for key in json_data:
+            if key.startswith("_"):
+                raise forms.ValidationError("fields should not start with underscore")
+
+        self.json_data = json_data
+
+        return value
+
+    def get_fieldsets(self):
+        return [(None, {'fields': ['json']})]
+
+    def save(self, model):
+        # removing old keys - on edit only
+        if self.instance:
+            old_keys = self.prepare_json_data().keys()
+            for key in old_keys:
+                if key not in self.json_data:
+                    delattr(self.instance, key)
+
+            for key in self.json_data:
+                setattr(self.instance, key, self.json_data[key])
+        else:
+            self.instance = model.from_json(self.cleaned_data.get('json'))
+
+        self.instance.save()
+
+
+class JSONDocumentAdmin(DocumentAdmin):
+    @csrf_protect_m
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        to_field = request.POST.get(TO_FIELD_VAR, request.GET.get(TO_FIELD_VAR))
+        if to_field and not self.to_field_allowed(request, to_field):
+            raise DisallowedModelAdminToField("The field %s cannot be referenced." % to_field)
+
+        model = self.model
+        opts = model._meta
+
+        if request.method == 'POST' and '_saveasnew' in request.POST:
+            object_id = None
+
+        add = object_id is None
+
+        if add:
+            if not self.has_add_permission(request):
+                raise PermissionDenied
+            obj = None
+
+        else:
+            obj = self.get_object(request, unquote(object_id), to_field)
+
+            if not self.has_change_permission(request, obj):
+                raise PermissionDenied
+
+            if obj is None:
+                raise Http404(_('%(name)s object with primary key %(key)r does not exist.') % {
+                    'name': force_text(opts.verbose_name), 'key': escape(object_id)})
+
+        form = SimpleJSONForm()
+        if request.method == 'POST':
+            form = SimpleJSONForm(request.POST, instance=obj)
+            if form.is_valid():
+                form_validated = True
+                form.save(self.model)
+            else:
+                form_validated = False
+        else:
+            if obj:
+                form = SimpleJSONForm(instance=obj)
+            else:
+                form = SimpleJSONForm()
+
+        adminForm = helpers.AdminForm(
+            form,
+            form.get_fieldsets(), #list(self.get_fieldsets(request, obj)),
+            {}, #self.get_prepopulated_fields(request, obj),
+            [], #[self.get_readonly_fields(request, obj)],
+            model_admin=self)
+        media = self.media + adminForm.media
+
+        context = dict(self.admin_site.each_context(request),
+            title=(_('Add %s') if add else _('Change %s')) % force_text(opts.verbose_name),
+            adminform=adminForm,
+            object_id=object_id,
+            original=obj,
+            is_popup=(IS_POPUP_VAR in request.POST or
+                      IS_POPUP_VAR in request.GET),
+            to_field=to_field,
+            media=media,
+            errors=helpers.AdminErrorList(form, []),
+            preserved_filters=self.get_preserved_filters(request),
+        )
+
+        # Hide the "Save" and "Save and continue" buttons if "Save as New" was
+        # previously chosen to prevent the interface from getting confusing.
+        if request.method == 'POST' and not form_validated and "_saveasnew" in request.POST:
+            context['show_save'] = False
+            context['show_save_and_continue'] = False
+            # Use the change template instead of the add template.
+            add = False
+
+        context.update(extra_context or {})
+
+        return self.render_change_form(request, context, add=add, change=not add, obj=obj, form_url=form_url)
