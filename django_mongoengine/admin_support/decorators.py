@@ -15,8 +15,9 @@ def dynamic_fields_list_display(*field_names):
             name = '_get_%s' % field_name
             setattr(cls, name, function_factory(field_name))
             if isinstance(cls.list_display, list):
-                cls.list_display.append(name)
+                cls.list_display = cls.list_display + [name]
             else:
                 cls.list_display = cls.list_display + (name, )
+            print cls, cls.list_display
         return cls
     return wrapper

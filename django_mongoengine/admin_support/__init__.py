@@ -4,8 +4,6 @@ from django.conf import settings
 
 if 'django_mongoengine.admin_support' in settings.INSTALLED_APPS:
     from django.contrib.admin.sites import AdminSite
-    from django.contrib.admin.checks import ModelAdminChecks
-    from django_mongoengine.document import DynamicDocument
     from mongoengine.base.metaclasses import TopLevelDocumentMetaclass, DocumentMetaclass
 
     def patched_register(self, model_or_iterable, admin_class=None, **options):
