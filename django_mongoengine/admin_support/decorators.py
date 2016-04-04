@@ -18,6 +18,5 @@ def dynamic_fields_list_display(*field_names):
                 cls.list_display = cls.list_display + [name]
             else:
                 cls.list_display = cls.list_display + (name, )
-            print cls, cls.list_display
         return cls
     return wrapper
